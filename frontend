@@ -1,0 +1,89 @@
+// frontend/src/App.js
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import './App.css';
+
+const API_BASE = 'http://localhost:5000'; // Flask default port
+
+function App() {
+  const [catalog, setCatalog] = useState([]);
+  const [preferences, setPreferences] = useState({ categories: '', price_range: '', styles: '' });
+  const [history, setHistory] = useState([]);
+  const [recommendations, setRecommendationas;
+  useEffect(() => {
+    axios.get(`${API_BASE}/catalog`)
+      .then(res => setCatalog(res.data.catalog))
+      .catch(err => console.error(err));
+  }, []);
+
+  const handlePreferenceChange = (e) => {
+    setPreferences({ ...preferences, [e.target.name]: e.target.value });
+  };
+
+  const submitPreferences = () => {
+    axios.post(`${API_BASE}/preferences`, { user_id: userId, preferences })
+      .then(() => alert('Preferences saved'))
+      .catch(err => console.error(err));
+  };
+
+  const addToHistory = (product) => {
+    axios.post(`${API_BASE}/history`, { user_id: userId, product_id: product.id })
+      .then(() => {
+        setHistory([...history, product]);
+      }
+  };
+
+  const getRecommendations = () => {
+    axios.gI_BASE}/recommendations?user_id=${userId}`)
+      .then(res => setRecommendations(res.data.recommendations))
+      .catch(err => console.error(err));
+  };
+
+  return (    <div className="App">
+      <h1>Product Recommendation App</h1>
+      
+      <section>
+        <h2>Product Catalog</h2>
+        <ul>
+          {catalog.map(product => (
+            <li key={product.id}>
+              {product.name} - ${product.price} ({product.category}, {product.style})
+              <button onClick={() => addToHistory(product)}>View (Add to History)</button>
+            </li>
+          ))}
+        </ul>
+      </section>
+      
+      <section>
+        <h2>User Preferences</h2>
+        <input name="categories" placeholder="Categories (e.g., electronics,sports)" value={preferences.categories} onChange={handlePreferenceChange} />
+        <input name="price_range" placeholder="Price range (e.g., 0-100)" value={preferences.price_range} onChange={handlePreferenceChange} />
+        <input name="styles" placeholder="Styles (e.g., modern,classic)" value={preferences.styles} onChange={handlePreferenceChange} />
+        <button onClick={submitPreferences}>Save Preferences</button>
+      </section>
+      
+      <section>
+        <h2>Browsing History</h2>
+        <ul>
+          {history.map((product, idx) => (
+            <li key={idx}>{product.name}</li>
+          ))}
+        </ul>
+      </section>
+      
+      <section>
+        <h2>Personalized Recommendations</h2>
+        <button onClick={getRecommendations}>Get Recommendations</button>
+        <ul>
+          {recommendations.map((rec, idx) => (
+            <li key={idx}>
+              <strong>{rec.name}</strong>: {rec.explanation}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+export default App;
