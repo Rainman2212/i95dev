@@ -1,0 +1,96 @@
+ backend/app.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import openai
+import os
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for React frontend
+
+# Set your OpenAI API key
+openai.api_key = os.getenv('OPENAI_API_KEY')  # Replace with your actual key or set as env var
+
+# Sample product catalog (hardcoded for demo)
+PRODUCT_CATALOG = [
+    {"id": 1, "name": "Wireless Headphones", "category": "electronics", "price": 99.99, "style": "modern"},
+    {"id": 2, "name": "Running Shoes", "category": "sports", "price": 59.99, "style": "athletic"},
+    {"id": 3, "name": "Leather Jacket", "category": "clothing", "price": 149.99, "style": "classic"},
+    {"id": 4, "name": "Smartphone", "category": "electronics", "price": 499.99, "style": "tech"},
+    {"id": 5, "name": "Coffee Maker", "category": "home", "price": 79.99, "style": "practical"},
+
+]
+
+# In-memory storage for user data (for demo; use database in production)
+users_data = {}  # key: user_id, value: {"preferences": {}, "history": []}
+
+def generate_prompt(preferences, history):
+    # Prompt engineering: Optimize for personalized recommendations
+    catalog_str = "\n".join([f"- {p['name']} ({p['category']}, ${p['price']}, {p['style']})" for p in PRODUCT_CATALOG])
+    history_str = ", ".join([h['name'] for h in history]) if history else "No history"
+    prefs_str = f"Categories: {preferences.get('categories', 'any')}, Price range: {preferences.get('price_range', 'any')}, Styles: {preferences.get('styles', 'any')}"
+    
+    prompt = f"""
+    You are a product recommendation expert. Based on the user's preferences and browsing history, recommend 3-5 products from the following catalog.
+    For each recommendation, provide a brief explanation why it matches the user's preferences and history.
+    
+    User preferences: {prefs_str}
+    Browsing history: {history_str}
+    
+    Catalog:
+    {catalog_str}
+    
+    Output format: JSON array of objects with keys: name, explanation
+    """
+    return prompt
+
+@app.route('/preferences', methods=['POST'])
+
+    data = request.json
+    user_id = data.get('user_id', 'default')
+    preferences = data.get('preferences', {})
+    if user_id not in users_data:
+        users_data[user_id] = {"preferences": {}, "history": []}
+    users_data[user_id]['preferences'] = preferences
+    return jsonify({"message": "Preferences updated"}), 200
+
+@app.route('/history', methods=['POST'])
+def add_history():
+    data = request.json
+    user_id = data.get('user_id', 'default')
+    product_id = data.get('product_id')
+    product = next((p for p in PRODUCT_CATALOG if p['id'] == product_id), None)
+    if not product:
+        return jsonify({"error": "Product not found"}), 404
+    if user_id not in users_data:
+        users_data[user_id] = {"preferences": {}, "history": []}
+    users_data[user_id]['history'].append(product)
+    return jsonify({"message": "History updated"}), 200
+
+@app.route('/recommendations', methods=['GET'])
+def get_recommendations():
+    user_id = request.args.get('user_id', 'default')
+    if user_id not in users_data:
+        return jsonify({"error": "No data for user"}), 404
+    
+    preferences = users_data[user_id]['preferences']
+    history = users_data[user_id]['history']
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "system", "content": prompt}]
+    )
+    
+    try:
+        recommendations = response['choices'][0]['message']['content']
+        # Assuming LLM outputs valid JSON
+        import json
+        recs = json.loads(recommendations)
+    except:
+    
+    return jsonify({"recommendations": recs}), 200
+
+@app.route('/catalog', methods=['GET'])
+def get_catalog():
+    return jsonify({"catalog": PRODUCT_CATALOG}), 200
+
+if __name__ == '__main__':
+    app.run(debug=True)
